@@ -1,0 +1,51 @@
+import 'database_helper.dart';
+import '../globals.dart';
+import 'package:sqflite/sqflite.dart';
+
+class AppState {
+  static Future<void> checkTeacherProfile() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final List<Map<String, dynamic>> result = await db.query('teacher', limit: 1);
+      final List<Map<String, dynamic>> settings = await db.query('settings');
+     
+     final List<Map<String, dynamic>> maps = await db.query('tracker');
+     for (var sets in settings) {
+      if (sets['key'] == 'useAdmissionNumber') {
+        useAdmissionNumber = sets['value'] == 'true' ;
+        
+      }
+      if(sets['key']=='isjss'){
+        isjss = sets['value'] == 'true';
+      }
+
+     }
+    for (var map in maps) {
+      if (map['key'] == 'continuingOnboarding') {
+        continuingOnboarding = map['value'] == 'true';
+      } 
+
+   } 
+      
+      if (result.isNotEmpty) {
+        hasTeacher = true;
+        teacherName = result[0]['full_name'] ?? '';
+        schoolName = result[0]['school_name'] ?? '';
+        await db.insert('tracker', {
+          'key': 'hasTeacher',
+          'value': '$hasTeacher', 
+        }, conflictAlgorithm: ConflictAlgorithm.replace);   
+      } else {
+        hasTeacher = false;
+        await db.insert('tracker', {
+          'key': 'hasTeacher',
+          'value': '$hasTeacher', 
+        }, conflictAlgorithm: ConflictAlgorithm.replace); 
+      }
+    } catch (e) {
+      print("Error checking teacher profile: $e");
+      hasTeacher = false; // Default to false if there's an error
+    }
+  }
+
+}
