@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'theme.dart';
 import '../services/database_helper.dart';
 import '../globals.dart';   // for useAdmissionNumber
+import 'package:sqflite/sqflite.dart';
 
 class AddStudentBottomSheet extends StatefulWidget {
   final int classId;
@@ -59,9 +60,16 @@ class _AddStudentBottomSheetState extends State<AddStudentBottomSheet> {
           } catch (_) {}
         }
         data['admission_number'] = nextNum.toString().padLeft(4, '0');
+      
       }
 
       await db.insert('students', data);
+      await db.update(
+        'classes',
+        {'student_count': await _getStudentCount(db, widget.classId)},
+        where: 'id = ?',
+        whereArgs: [widget.classId],
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +88,15 @@ class _AddStudentBottomSheetState extends State<AddStudentBottomSheet> {
     } finally {
       setState(() => isLoading = false);
     }
+       
   }
+  Future<int> _getStudentCount(Database db, int classId) async {
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM students WHERE class_id = ?',
+        [classId],
+      );
+      return Sqflite.firstIntValue(result) ?? 0;
+    }
 
   @override
   Widget build(BuildContext context) {

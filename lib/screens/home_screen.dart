@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   //String classPlural = "Classes";
   List<Map<String, dynamic>> classes = [];
+  List<Map<String, dynamic>> students = []; 
   List<Map<String, dynamic>> sbj = [];
   bool isLoading = true;  
   @override
@@ -55,10 +56,13 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         setState(() => isLoading = true);
         final subjects= await db.query ('subjects');
+        final student= await db.query('students');  
         final results= await db.query('classes', orderBy: 'created_at DESC');
         setState((){
         classes = results;
         sbj = subjects;
+        students = student;
+
         
         if (classes.length == 1) {
             classPlural = "Class";
@@ -148,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Overview Stats
             Row(
               children: [
-                _buildStatCard("Students", "128", "All classes", Colors.blue),
+                _buildStatCard("Students", "${students.length}", "All classes", Colors.blue),
                 const SizedBox(width: 12),
                 _buildStatCard("$classPlural", "${classes.length}", "Active", Colors.green),
               ],
@@ -158,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildStatCard("Subjects", "${sbj.length}", "This term", Colors.orange),
                 const SizedBox(width: 12),
-                _buildStatCard("Reports", "4", "Generated", Colors.purple),
+                _buildStatCard("Reports"," Infinite", "Generated", Colors.purple),
               ],
             ),
 
@@ -179,18 +183,35 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisSpacing: 12,
               childAspectRatio: 1.1,
               children: [
-                _buildActionCard(Icons.person_add, "Add Student", Colors.blue),
-                _buildActionCard(Icons.edit_note, "Enter Marks", Colors.green),
-                _buildActionCard(Icons.calculate, "Calculate", Colors.orange),
+                _buildActionCard(Icons.settings, "Settings", Colors.blueGrey, onTap: () {
+                  Navigator.pushNamedAndRemoveUntil(context, '/settings',(route)=>false);
+                }),
+              
+                _buildActionCard(Icons.schedule, "TimeTable", Colors.orange, onTap: () {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                    content: Text("Coming Soon...!"),
+                    backgroundColor: AppTheme.success,
+      ),
+    );              
+                          },
+                ),
                 _buildActionCard(Icons.class_,
                  classPlural,
                   Colors.indigo,
                  onTap: () {
-                  Navigator.pushNamed(context, '/class');
+                  Navigator.pushNamedAndRemoveUntil(context, '/class',(route)=> false);
                  },
                  ),
-                _buildActionCard(Icons.book, "Subjects", Colors.teal),
-                _buildActionCard(Icons.picture_as_pdf, "Reports", Colors.red),
+                _buildActionCard(Icons.book, "Subjects", Colors.teal, onTap: () {
+                  Navigator.pushNamed(context, '/subjects');
+                }
+                ),
+                _buildActionCard(Icons.picture_as_pdf, "Reports", Colors.red, onTap: () {
+                  Navigator.pushNamedAndRemoveUntil(context, '/reports', (route)=> false);
+                },
+                ),
+                
               ],
             ),
 
@@ -237,8 +258,16 @@ class _HomeScreenState extends State<HomeScreen> {
       // Bottom Navigation
       bottomNavigationBar: BottomNavigationBar(
         onTap: (index) {
-            if (index == 2) {
-              Navigator.pushNamed(context, '/class');
+           if (index == 2) {
+              Navigator.pushNamedAndRemoveUntil(context, '/class', (route) => false);
+            } else if (index== 3) {
+              Navigator.pushNamedAndRemoveUntil(context, '/reports', (route) => false);
+            } else if (index==0) {
+                Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false,);
+            } else if (index == 4) {
+              Navigator.pushNamedAndRemoveUntil(context, '/settings',(route)=> false);
+            } else if (index==1) {
+                Navigator.pushNamedAndRemoveUntil(context, '/group', (route) => false,);
             }
         },
         type: BottomNavigationBarType.fixed,
@@ -247,10 +276,10 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: 0,
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: "Students"),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: "Group"),
           BottomNavigationBarItem(icon: Icon(Icons.class_), label: classPlural),
           BottomNavigationBarItem(icon: Icon(Icons.assessment), label: "Reports"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "More"),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "settings"),
         ],
       ),
     );

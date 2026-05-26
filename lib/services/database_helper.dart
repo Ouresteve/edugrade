@@ -167,6 +167,17 @@ class DatabaseHelper {
         {'level':'jss', 'grade':'AE2', 'min_mark':35,'max_mark':44, 'point':3, 'color':'#F59E0B'},
         {'level':'jss', 'grade':'BE1', 'min_mark':25,'max_mark':34, 'point':2, 'color':'#F97316'},
         {'level':'jss', 'grade':'BE2', 'min_mark':0,'max_mark':24, 'point':1, 'color':'#DC2626'},
+
+        //Aggregate points
+        {'level':'agp', 'grade':'EE1', 'min_mark':68,'max_mark':72, 'point':8, 'color':'#15803D'},
+        {'level':'agp', 'grade':'EE2', 'min_mark':63,'max_mark':67, 'point':7, 'color':'#16A34A'},
+        {'level':'agp', 'grade':'ME1', 'min_mark':54,'max_mark':62, 'point':6, 'color':'#2563EB'},
+        {'level':'agp', 'grade':'ME2', 'min_mark':45,'max_mark':53, 'point':5, 'color':'#3B82F6'},
+        {'level':'agp', 'grade':'AE1', 'min_mark':36,'max_mark':44, 'point':4, 'color':'#60A5FA'},
+        {'level':'agp', 'grade':'AE2', 'min_mark':27,'max_mark':35, 'point':3, 'color':'#F59E0B'},
+        {'level':'agp', 'grade':'BE1', 'min_mark':19,'max_mark':26, 'point':2, 'color':'#F97316'},
+        {'level':'agp', 'grade':'BE2', 'min_mark':0,'max_mark':24, 'point':1, 'color':'#DC2626'},
+
       ];
       for (var grades in defaultPrimaryGrades) {
         await db.insert('grading_config',{

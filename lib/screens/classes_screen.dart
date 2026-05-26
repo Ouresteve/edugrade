@@ -14,6 +14,8 @@ class ClassesScreen extends StatefulWidget {
 
 class _ClassesScreenState extends State<ClassesScreen> {
   List<Map<String, dynamic>> classes = [];
+  List<Map<String, dynamic>> student = [];
+
   bool isLoading = true;
 
   @override
@@ -88,16 +90,24 @@ class _ClassesScreenState extends State<ClassesScreen> {
         selectedItemColor: AppTheme.primary,
         unselectedItemColor: Colors.grey,
         onTap: (index) {
-          if(index== 0){
-            Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false,);
-          }
+          if (index == 2) {
+              Navigator.pushNamedAndRemoveUntil(context, '/class', (route) => false);
+            } else if (index== 3) {
+              Navigator.pushNamedAndRemoveUntil(context, '/reports', (route) => false);
+            } else if (index==0) {
+                Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false,);
+            }  else if (index==1) {
+                Navigator.pushNamedAndRemoveUntil(context, '/group', (route) => false,);
+            } else if (index==4) {
+                Navigator.pushNamedAndRemoveUntil(context, '/settings', (route) => false,);
+            }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: "Students"),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: "Group"),
           BottomNavigationBarItem(icon: Icon(Icons.class_), label: "Classes"),
           BottomNavigationBarItem(icon: Icon(Icons.assessment), label: "Reports"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "More"),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
         ],
       ),
     );

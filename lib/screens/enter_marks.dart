@@ -8,8 +8,9 @@ import 'classes_detail_screen.dart';
 
 class EnterMarksScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
+  final Future<void> Function() reload;
   
-  const EnterMarksScreen({super.key, required this.classData}); 
+  const EnterMarksScreen({super.key, required this.classData, required this.reload}); 
   
   
    @override
@@ -143,7 +144,7 @@ Future<void> _loadMarksForSelection(String subjectCode) async {
 }
 Map<String, dynamic> _getGradeFromMark(double? mark) {
   if(mark==null) return {'grade':'-','color':'#9E9E9E'};
-  print (' Grades Fetched= s$gradingConfig');
+  
   for(var g in gradingConfig) {
     final min=g['min_mark'] as int;
     final max = g['max_mark'] as int? ?? 100;
@@ -209,7 +210,7 @@ try {
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
-
+        
         savedCount++;
       } catch (_) {
         errorCount++;
@@ -218,11 +219,12 @@ try {
   }
 
   if (mounted) {
+    widget.reload();
+
     String message = '$savedCount marks saved successfully!';
     if (errorCount > 0) {
       message += ' ($errorCount errors)';
     }
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -685,8 +687,8 @@ if (filteredStudents.isEmpty) {
         Container(
           width: 150,                  // Match the width of student column
           alignment: Alignment.center,
-          child: const Text(
-            "Student Name",
+          child:  Text(
+            selectedSubjectCode ?? '',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,

@@ -10,6 +10,9 @@ import 'screens/setup.dart';
 import 'screens/cbc_config.dart';
 import 'screens/student_config.dart';
 import 'screens/classes_screen.dart';
+import 'screens/reports_archive_screen.dart';
+import 'screens/settings.dart';
+import 'screens/collaboration.dart';
 
 
 void main() async {
@@ -19,8 +22,22 @@ void main() async {
 
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +45,8 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'EduGrade.KE',
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: _themeMode,
       home: const EntryPoint(),
        routes: {
         '/home': (context) => const HomeScreen(),
@@ -36,8 +55,15 @@ class MyApp extends StatelessWidget {
         '/student_config': (context) => const StudentConfigScreen(),
         '/class': (context) => const ClassesScreen(),
         '/subjects' : (context) => const SubjectsScreen(),
+        '/reports' : (context) => const  ReportsArchiveScreen(),
+        '/group': (context) => const CollaborationScreen(),
         
+        '/settings': (context) =>  SettingsScreen(toggleTheme: toggleTheme),
       },
+
     );
   }
-}      
+}
+   
+
+  

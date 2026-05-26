@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
 import 'theme.dart';
 import '../services/database_helper.dart';
 import 'add_student_screen.dart';  
 import '../globals.dart'; 
 import 'classes_screen.dart';
 import 'enter_marks.dart';
+import 'class_report_screen.dart';
 class ClassDetailScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
   final bool triggerAddStudent;
@@ -22,14 +24,27 @@ class ClassDetailScreen extends StatefulWidget {
 }
 
 class _ClassDetailScreenState extends State<ClassDetailScreen> {
+  double averageScore = 0.0;
+  int belowExpectationsCount= 0;
+  String selectedYear = DateTime.now().year.toString();
+
+  String selectedExam = "EXAM 1";
   String selectedTerm = "Term 1";
+  List<Map<String,dynamic>> topSubjects = [];
+  List<Map<String,dynamic>> subjects = [];
+  List<Map<String,dynamic>> rankedStudents = [];
+  List<Map<String, dynamic>> grading_config = [];
+  List<Map<String, dynamic>> gradingConfig = [];
   List<Map<String, dynamic>> students = [];
+  List<Map<String,dynamic>> assess = [];
+  bool isLoadingPerformance = false;
   bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadStudents();
+    
     if (widget.triggerAddStudent){
     WidgetsBinding.instance.addPostFrameCallback((_){
       _addStudent();
@@ -40,22 +55,214 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
 
   Future<void> _loadStudents() async {
-    setState(() => isLoading = true);
+    setState((){
+      isLoading = true;
+      
+      isLoadingPerformance = true;
+    });
     try {
       final db = await DatabaseHelper.instance.database;
       final result = await db.query(
         'students',
         where: 'class_id = ?',
         whereArgs: [widget.classData['id']],
+        orderBy: 'full_name ASC',
       );
-      setState(() {
-        students = result;
-        isLoading = false;
-      });
+      students = result;
+      await _calculatePerformance();
+
     } catch (e) {
+      print("Erro loading class data: $e");
       setState(() => isLoading = false);
+    } finally {
+      setState(() {
+        isLoading = false;
+        isLoadingPerformance = false;
+      });
     }
   }
+
+Future<void> _calculatePerformance() async {
+  if (students.isEmpty) {
+    setState(() {
+      averageScore = 0;
+      belowExpectationsCount = 0;
+      
+      topSubjects = [];
+      rankedStudents = [];
+    });
+    return;
+  }
+  setState(() {
+    isLoadingPerformance = true;
+    
+    });
+  belowExpectationsCount = 0;
+
+  try {
+    final db = await DatabaseHelper.instance.database;
+    final gradeRes = await db.query (
+      'grading_config',
+      where: 'level=?',
+      whereArgs: [widget.classData['level']],
+    );
+    final assessments = await db.query(
+      'assessments',
+      where: 'class_id = ? AND term = ? AND academic_year = ? AND assessment_type = ?',
+      whereArgs: [widget.classData['id'],
+       selectedTerm,
+       selectedYear,
+       selectedExam,
+       ],
+       
+    );
+    assess = assessments;
+
+    final gradesRe = await db.query(
+    'grading_config',
+    where: 'level = ?',
+    whereArgs: ['agp'],
+    
+   );
+
+    final sub = await db.query(
+      'subjects',
+    );
+    subjects = sub;
+
+     gradingConfig = gradeRes;
+     grading_config = gradesRe;
+
+    if (assessments.isEmpty) {
+      setState(() {
+        averageScore = 0;
+        belowExpectationsCount = 0;
+        isLoadingPerformance = false;
+        topSubjects = [];
+        rankedStudents = students.map((s) => {...s, 'average': 0.0}).toList();
+      });
+      return;
+    }
+
+    double totalPoints = 0;
+    
+    int totalEntries = 0;
+
+    Map<String, List<double>> subjectPoints = {};
+    
+    Map<int, List<double>> studentPoints= {};
+
+    for (var a in assessments) {
+      final score = (a['raw_score']as num ?? 0.0).toDouble();
+      final point = _getPointsFromScore(score);
+      totalPoints += point;
+      
+      totalEntries++;
+
+      // Subject averages
+      String subject = a['subject_code'] as String;
+      subjectPoints.putIfAbsent(subject, ()=> []).add(point);
+           // Student total points
+      int studentId = a['student_id'] as int;
+      studentPoints.putIfAbsent(studentId, () => []).add(point);
+    }
+
+    // Overall Average
+    averageScore = totalEntries > 0 ? totalPoints / totalEntries : 0;
+
+    
+     
+
+    // Top 3 Subjects
+    topSubjects = subjectPoints.entries.map((e) {
+      double avg = e.value.reduce((a, b) => a + b) / e.value.length;
+      return {'subject': e.key, 'average': avg};
+    }).toList()
+      ..sort((a, b) => (b['average'] as double).compareTo(a['average'] as double));
+
+    if (topSubjects.length > 3) topSubjects = topSubjects.sublist(0, 3);
+
+    // Ranked Students
+    rankedStudents = students.map((s) {
+      int id = s['id'];
+      List<double> points = studentPoints[id] ?? [];
+      double total = points.isEmpty ? 0 : points.reduce((a, b) => a + b).toDouble();
+      double avgPoint = points.isEmpty ? 0 : total / points.length;
+      if(total<=26.0){
+        belowExpectationsCount++;
+      }
+      return {
+        ...s,
+        'totalPoints': total,
+        'averagePoint': avgPoint,
+      };
+      
+    }).toList()
+      ..sort((a, b) => (b['totalPoints'] as double).compareTo(a['totalPoints'] as double));
+
+
+  } catch (e) {
+    print("Performance calculation error: $e");
+  } finally {
+    setState(() {
+      isLoadingPerformance = false;
+    });
+  }
+}
+double _getPointsFromScore(double score) {
+  
+  for(var g in gradingConfig) {
+    final min = (g['min_mark'] as int?) ?? 0;
+    final max = (g['max_mark'] as int?) ?? 100;
+    if (score >=min && score <= max) {
+      return(g['point'] as num? ?? 0.0).toDouble();
+    }
+  }
+  return 0.0;
+}
+
+String getFinalGrade(double score)  {
+
+   String grade = "-";
+   String colors = "-";
+  
+  
+  for (var g in grading_config) {
+    int mark = g['min_mark'] as int;
+   
+    int maxMark = g['max_mark'] as int ;
+    if( score>= mark && score <= maxMark){
+      grade = g['grade'] as String;
+      colors = g['color'];
+      
+    }
+  }
+  return "$grade|$colors";
+  
+
+}
+
+int _getMinMark() {
+  for(var f in gradingConfig){
+    final min =(f['min_mark'] as int ?) ?? 0;
+    final max = (f['max_mark'] as int?) ?? 100;
+    if (f['point'] == 2 ) {
+      return min;
+  }
+  
+}
+return 0;
+}
+String _getGradefromPoint(int point) {
+
+  for (var g in gradingConfig) {
+    if( point == g['point']) {
+      return g['grade'] as String ;
+    }
+  
+  }
+  return '-';
+}
 
   Future<void> _addStudent() async {
     final success = await showModalBottomSheet<bool>(
@@ -115,7 +322,10 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (_) => EnterMarksScreen(classData: widget.classData),
+      builder: (_) => EnterMarksScreen(
+        classData: widget.classData,
+        reload: _calculatePerformance,
+      ),
     ),
   );
   }
@@ -138,6 +348,12 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     );
     if (confirm == true) {
       final db = await DatabaseHelper.instance.database;
+      await db.update(
+        'classes',
+        {'student_count': students.length - 1},
+        where: 'id = ?',
+        whereArgs: [widget.classData['id']],
+      );
       await db.delete('students', where: 'id = ?', whereArgs:[studentId]);
       _loadStudents();
     }
@@ -194,43 +410,126 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             const SizedBox(height: 20),
 
             // Term Selector
-            const Text("Term", style: TextStyle(fontWeight: FontWeight.bold)),
+           const Text("View Performance For", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: "Term 1", label: Text("Term 1")),
-                ButtonSegment(value: "Term 2", label: Text("Term 2")),
-                ButtonSegment(value: "Term 3", label: Text("Term 3")),
+            
+            Row(
+              children: [
+                // Term
+                Expanded(
+                  child: SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: "Term 1", label: Text("Term 1")),
+                      ButtonSegment(value: "Term 2", label: Text("Term 2")),
+                      ButtonSegment(value: "Term 3", label: Text("Term 3")),
+                    ],
+                    selected: {selectedTerm},
+                    onSelectionChanged: (Set<String> selection) {
+                      setState(() => selectedTerm = selection.first);
+                      _calculatePerformance();
+                    },
+                  ),
+                ),
               ],
-              selected: {selectedTerm},
-              onSelectionChanged: (Set<String> selection) {
-                setState(() => selectedTerm = selection.first);
-              },
-            ), 
+            ),
 
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                // Year Selector
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: selectedYear,
+                    decoration: const InputDecoration(
+                      labelText: "Year",
+                      border: OutlineInputBorder(),
+                    ),
+                    items: List.generate(5, (i) => (DateTime.now().year - 2 + i).toString())
+                        .map((year) => DropdownMenuItem(value: year, child: Text(year)))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => selectedYear = value);
+                        _calculatePerformance();
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Exam Selector
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: selectedExam,
+                    decoration: const InputDecoration(
+                      labelText: "Exam",
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: "EXAM 1", child: Text("EXAM 1")),
+                      DropdownMenuItem(value: "EXAM 2", child: Text("EXAM 2")),
+                      DropdownMenuItem(value: "EXAM 3", child: Text("EXAM 3")),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => selectedExam = value);
+                        _calculatePerformance();
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 28),
 
             // Analytics Cards
             const Text("Performance Overview", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Row(
+
+            isLoadingPerformance
+              ? Row(
+                children: [
+                Expanded(child: _buildSkeletonCard()),
+                const SizedBox(width:12),
+                Expanded(child: _buildSkeletonCard()),
+                ],
+              )
+              
+              : Row(
               children: [
                 _buildAnalyticCard("Total Students", "${students.length}", "", Colors.blue),
                 const SizedBox(width: 12),
-                _buildAnalyticCard("Avg Score", "0%", "↑ 3%", Colors.green),
+                _buildAnalyticCard("Avg Points", "${averageScore.toStringAsFixed(1)}", "", Colors.green),
               ],
             ),
             const SizedBox(height: 12),
-            Row(
+            
+
+            isLoadingPerformance 
+            ? Row(
               children: [
-                _buildAnalyticCard("Top 3 Subjects", "MAT, ENG, KISW", "", Colors.orange),
+                Expanded(child:_buildSkeletonCard()),
                 const SizedBox(width: 12),
-                _buildAnalyticCard("Below Expectations", "7", "Students", Colors.red),
+                Expanded(child: _buildSkeletonCard()),
+              ],
+            )
+            
+            
+            : Row(
+              children: [
+                _buildAnalyticCard("Top 3 Subjects", topSubjects.isNotEmpty ? 
+                topSubjects.map((s)=> s['subject']).join(", ")
+                : "No data", "", const Color.fromARGB(255, 72, 52, 21)),
+
+                const SizedBox(width: 12),
+                _buildAnalyticCard("Below Expectations", "$belowExpectationsCount", "Students", Colors.red),
               ],
             ),
 
             const SizedBox(height: 32),
             // Quick Actions Updated 
+            const Text("Actions", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -241,38 +540,38 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
               children: [
                _buildActionCard(Icons.person_add, "Add Student", Colors.blue, onTap: _addStudent),
                 _buildActionCard(Icons.edit_note, "Enter Marks", Colors.green, onTap: _enterMarks),
-                _buildActionCard(Icons.people, "View All Students", Colors.indigo),
-                _buildActionCard(Icons.picture_as_pdf, "Generate Report", Colors.red),
+                //_buildActionCard(Icons.people, "View All Students", Colors.indigo),
+                _buildActionCard(Icons.picture_as_pdf, "Generate Report", Colors.red, onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ClassReportScreen(
+                        classData: widget.classData,
+                        initialTerm: selectedTerm,
+                        initialYear: selectedYear,
+                        initialExam: selectedExam,
+                        rankedStudents: rankedStudents,
+                        topSubjects: topSubjects,
+                        subjects: subjects,
+                        assessments: assess,
+                        getPointsFromScore: _getPointsFromScore,
+                        getGrade: getFinalGrade,
+                      ),
+                    ),
+                  );
+                }),
               ],
               
             ),
-            //=====Updated fr====
-            // Quick Actions
-           /* const Text("Quick Actions", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 2.3,
-              children: [
-                _buildActionButton(Icons.person_add, "Add Student", Colors.blue, onTap: _addStudent),
-                _buildActionButton(Icons.edit_note, "Enter Marks", Colors.green, onTap: _enterMarks),
-                _buildActionButton(Icons.people, "View All Students", Colors.indigo),
-                _buildActionButton(Icons.picture_as_pdf, "Generate Report", Colors.red),
-              ],
-            ),
-*/
-            const SizedBox(height: 32),
 
-            // Students List
+             const SizedBox(height: 32),
+
+            // Ranked Students List
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("Students", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                TextButton(onPressed: () {}, child: const Text("View All")),
+                const Text("Students Ranking", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                //TextButton(onPressed: () {}, child: const Text("View All")),
               ],
             ),
             const SizedBox(height: 8),
@@ -284,27 +583,76 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                   child: Center(child: Text("No students added yet")),
                 ),
               )
+            else if (isLoadingPerformance)
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 5,
+                itemBuilder: (context, index) => _buildSkeletonCard(),
+              )
             else
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: students.length,
+                itemCount: rankedStudents.length,
                 itemBuilder: (context, index) {
-                  final student = students[index];
+                  final student = rankedStudents[index];
+                  final avg = student['totalPoints'] != null 
+                          ? (student['totalPoints'] as num).toDouble() 
+                           : 0.0;
+
+
                   return Card(
                     margin: const EdgeInsets.only(bottom: 10),
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: Colors.grey.shade200,
-                        child: Text("${student['class_id']}" ), // to modify later to read position
+                        child: Text("#${index + 1}"),
                       ),
                       title: Text(student['full_name']),
-                      subtitle: Text("Adm No: ${student['admission_number'] ?? 'N/A'}"),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline,color: Colors.red),
-                        onPressed: () => _deleteStudent(student['id'], student['full_name']),
-                      ),
+                     subtitle: FutureBuilder<String>(
+  // 1. Pass your async function here
+  future: Future.value(getFinalGrade(avg)), 
+  builder: (context, snapshot) {
+    // 2. Show a small loading message or dash while waiting for the calculation
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return Text("Adm: ${student['admission_number'] ?? 'N/A'} • ${avg.toStringAsFixed(1)}points • Checking...");
+    }
+    
+    // 3. Fallback to 'N/A' if an error happens or data returns null
+     final gradePartsMain = snapshot.data ?? 'N/A';
+     final parts = gradePartsMain.split("|");
+     String grade= parts[0];
+     String rangi = parts[1];
+    // 4. Render the clean CBC grade once the data arrives
+    return Text("Adm: ${student['admission_number'] ?? 'N/A'} • ${avg.toStringAsFixed(1)}points • $grade",
+                  style:  TextStyle( color: Color(int.parse(rangi.replaceFirst('#','').padLeft(8,'FF'), radix:16)),
+                  ),
+                  );
+    
+  },
+),
+                      
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.visibility, color: Colors.blue),
+                            onPressed: () {
+                              // TODO: Navigate to Student Detail Screen later
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Opening ${student['full_name']}'s profile")),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: () => _deleteStudent(student['id'], student['full_name']),
+                          ),
+                                            
+                        ],
                     ),
+                  ),
                   );
                 },
               ),
@@ -435,3 +783,24 @@ class _EditClassBottomSheetState extends State<EditClassBottomSheet> {
     );
   }
 }
+
+
+
+
+
+//Skeleton loader
+  Widget _buildSkeletonCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(width: 100, height: 12, color: Colors.grey[300]),
+            const SizedBox(height: 12),
+            Container(width: 60, height: 28, color: Colors.grey[300]),
+          ],
+        ),
+      ),
+    );
+  }

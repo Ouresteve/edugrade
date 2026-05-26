@@ -13,17 +13,15 @@ class CbcConfigScreen extends StatefulWidget {
 
 class _CbcConfigScreenState extends State<CbcConfigScreen> {
   bool _isLoading = true;
-  String selectedLevel = "primary";
-  // "primary" or "jss"
+  String selectedLevel = "primary"; // "primary" or "jss"
 
-  // Controllers for editing
   final Map<String, TextEditingController> _minControllers = {};
+  final Map<String, TextEditingController> _maxControllers = {};
   final Map<String, TextEditingController> _pointControllers = {};
 
   @override
   void initState() {
     super.initState();
-    // Respect global isJSS from tracker
     selectedLevel = isjss ? "jss" : "primary";
     _loadGradingConfig();
   }
@@ -31,6 +29,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
   Future<void> _loadGradingConfig() async {
     setState(() => _isLoading = true);
     _minControllers.clear();
+    _maxControllers.clear();
     _pointControllers.clear();
 
     try {
@@ -44,15 +43,13 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
 
       for (var row in results) {
         String key = row['grade'] as String;
-        _minControllers[key] = TextEditingController(
-          text: (row['min_mark'] ?? 0).toString(),
-        );
-        if(selectedLevel == "jss" && row['point'] != null) {
-            _pointControllers[key] = TextEditingController(
-          text:(row['point'] ?? 0).toString(),
-        );
+
+        _minControllers[key] = TextEditingController(text: (row['min_mark'] ?? 0).toString());
+        _maxControllers[key] = TextEditingController(text: (row['max_mark'] ?? 100).toString());
+
+        if (selectedLevel == "jss" && row['point'] != null) {
+          _pointControllers[key] = TextEditingController(text: (row['point'] ?? 0).toString());
         }
-        
       }
     } catch (e) {
       print("Error loading grades: $e");
@@ -67,30 +64,28 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
     try {
       final db = await DatabaseHelper.instance.database;
 
-    
       for (var entry in _minControllers.entries) {
         String grade = entry.key;
         int minMark = int.tryParse(entry.value.text.trim()) ?? 0;
+        int maxMark = int.tryParse(_maxControllers[grade]?.text.trim() ?? '100') ?? 100;
         int? point = selectedLevel == "jss"
-              ? int.tryParse(_pointControllers[grade]?.text.trim() ?? '0')
-              : null;
+            ? int.tryParse(_pointControllers[grade]?.text.trim() ?? '0')
+            : null;
+
         await db.update(
           'grading_config',
-          {'min_mark': minMark,
-          if(point != null ) 'point': point, },
+          {
+            'min_mark': minMark,
+            'max_mark': maxMark,
+            if (point != null) 'point': point,
+          },
           where: 'level = ? AND grade = ?',
           whereArgs: [selectedLevel, grade],
         );
       }
 
-      // Update global tracker
+      // Update global
       isjss = (selectedLevel == "jss");
-      await db.update(
-        'tracker',{
-          'key':'isjss',
-          'value':'$isjss'
-        },conflictAlgorithm: ConflictAlgorithm.replace
-      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,7 +110,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-                  isjss = selectedLevel == "jss";
+    final bool isJSS = selectedLevel == "jss";
 
     return Scaffold(
       appBar: AppBar(
@@ -138,16 +133,14 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
               ],
               selected: {selectedLevel},
               onSelectionChanged: (Set<String> selection) {
-                setState(() {
-                  selectedLevel = selection.first;
-                });
-                _loadGradingConfig(); // Reload when level changes
+                setState(() => selectedLevel = selection.first);
+                _loadGradingConfig();
               },
             ),
 
             const SizedBox(height: 32),
             Text(
-              isjss ? "Junior Secondary (8 Levels)" : "Primary (4 Bands)",
+              isJSS ? "Junior Secondary (8 Levels)" : "Primary (4 Bands)",
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
@@ -156,7 +149,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
-                  children: isjss ? _buildJSSRows() : _buildPrimaryRows(),
+                  children: isJSS ? _buildJSSRows() : _buildPrimaryRows(),
                 ),
               ),
             ),
@@ -179,7 +172,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
 
   List<Widget> _buildPrimaryRows() {
     return [
-     _buildPrimaryRow("Exceeding Expectations (EE)", "EE"),
+      _buildPrimaryRow("Exceeding Expectations (EE)", "EE"),
       _buildPrimaryRow("Meeting Expectations (ME)", "ME"),
       _buildPrimaryRow("Approaching Expectations (AE)", "AE"),
       _buildPrimaryRow("Below Expectations (BE)", "BE"),
@@ -188,33 +181,40 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
 
   List<Widget> _buildJSSRows() {
     return [
-      _buildJSSRow("EE1 - Exceeding Expectations 1", "EE1"),
-      _buildJSSRow("EE2 - Exceeding Expectations 2", "EE2"),
-      _buildJSSRow("ME1 - Meeting Expectations 1", "ME1"),
-      _buildJSSRow("ME2 - Meeting Expectations 2", "ME2"),
-      _buildJSSRow("AE1 - Approaching Expectations 1", "AE1"),
-      _buildJSSRow("AE2 - Approaching Expectations 2", "AE2"),
-      _buildJSSRow("BE1 - Below Expectations 1", "BE1"),
-      _buildJSSRow("BE2 - Below Expectations 2", "BE2"),
+      _buildJSSRow("EE1 ", "EE1"),
+      _buildJSSRow("EE2", "EE2"),
+      _buildJSSRow("ME1", "ME1"),
+      _buildJSSRow("ME2", "ME2"),
+      _buildJSSRow("AE1", "AE1"),
+      _buildJSSRow("AE2 ", "AE2"),
+      _buildJSSRow("BE1", "BE1"),
+      _buildJSSRow("BE2", "BE2"),
     ];
   }
 
-   Widget _buildPrimaryRow(String label, String gradeKey) {
+  Widget _buildPrimaryRow(String label, String gradeKey) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
           Expanded(child: Text(label)),
           SizedBox(
-            width: 100,
+            width: 90,
             child: TextField(
               controller: _minControllers[gradeKey],
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                suffixText: "% ↑",
-              ),
+              decoration: const InputDecoration(border: OutlineInputBorder(), suffixText: "%"),
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 90,
+            child: TextField(
+              controller: _maxControllers[gradeKey],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(border: OutlineInputBorder(), suffixText: "%"),
             ),
           ),
         ],
@@ -229,28 +229,32 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
         children: [
           Expanded(child: Text(label)),
           SizedBox(
-            width: 90,
+            width: 80,
             child: TextField(
               controller: _minControllers[gradeKey],
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                suffixText: "% ↑",
-              ),
+              decoration: const InputDecoration(border: OutlineInputBorder(), suffixText: "→"),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 80,
+            child: TextField(
+              controller: _maxControllers[gradeKey],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(border: OutlineInputBorder(), suffixText: "%"),
             ),
           ),
           const SizedBox(width: 12),
           SizedBox(
-            width: 80,
+            width: 70,
             child: TextField(
               controller: _pointControllers[gradeKey],
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: "Pts",
-              ),
+              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: "Pts"),
             ),
           ),
         ],
