@@ -6,6 +6,9 @@ import '../services/database_helper.dart';
 import 'loading_dialog.dart';
 import '../globals.dart';
 import'../services/app_state.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+
 
 class StudentConfigScreen extends StatefulWidget {
   const StudentConfigScreen({super.key});
@@ -37,6 +40,10 @@ class _StudentConfigScreenState extends State<StudentConfigScreen> {
       }
 
       if (mounted) {
+        await FirebaseAnalytics.instance.logEvent(
+  name: 'setup_completed',
+  parameters: {'school_name': schoolName},
+);
         
         if (continuingOnboarding)  {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "819378374761",
+    "project_id": "edugrade-30ab5",
+    "storage_bucket": "edugrade-30ab5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:819378374761:android:3cdc60bed0bf39510bfaf8",
+        "android_client_info": {
+          "package_name": "com.example.edugrade"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHmodj6BLnVXNJXWUAaPTt712VdEQJrMg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

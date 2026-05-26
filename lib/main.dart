@@ -1,4 +1,6 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:edugrade/screens/classes_screen.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:edugrade/screens/subject_screen.dart';
 import 'package:flutter/material.dart';
 import 'screens/entry_point.dart';
@@ -15,9 +17,13 @@ import 'screens/settings.dart';
 import 'screens/collaboration.dart';
 
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   await AppState.checkTeacherProfile();
+  
+
   runApp(const MyApp());
 
 }

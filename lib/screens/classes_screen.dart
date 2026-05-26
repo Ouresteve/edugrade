@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'theme.dart';
 import '../services/database_helper.dart';
 import 'classes_detail_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 import '../globals.dart';
 
@@ -54,6 +56,13 @@ class _ClassesScreenState extends State<ClassesScreen> {
     );
 
     if (result != null) {
+      await FirebaseAnalytics.instance.logEvent(
+  name: 'class_created',
+  parameters: {
+    'class_name': result['class_name'],
+    'level': result ['level'],
+  },
+);
       final db = await DatabaseHelper.instance.database;
       await db.insert('classes', result);
       _loadClasses();

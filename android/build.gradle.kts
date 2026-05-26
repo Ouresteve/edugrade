@@ -1,8 +1,21 @@
+buildscript {
+    repositories{
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath ("com.google.gms:google-services:4.4.1")  // Add this
+    }
+}
+
 allprojects {
     repositories {
         google()
         mavenCentral()
     }
+    
+
+
 }
 
 val newBuildDir: Directory =

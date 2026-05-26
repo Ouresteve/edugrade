@@ -162,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildStatCard("Subjects", "${sbj.length}", "This term", Colors.orange),
                 const SizedBox(width: 12),
-                _buildStatCard("Reports"," Infinite", "Generated", Colors.purple),
+                _buildStatCard("Reports"," Infinite", "Generation", Colors.purple),
               ],
             ),
 

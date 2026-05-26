@@ -1,9 +1,12 @@
 import 'database_helper.dart';
 import '../globals.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class AppState {
   static Future<void> checkTeacherProfile() async {
+    
     try {
       final db = await DatabaseHelper.instance.database;
       final List<Map<String, dynamic>> result = await db.query('teacher', limit: 1);
@@ -31,6 +34,10 @@ class AppState {
         hasTeacher = true;
         teacherName = result[0]['full_name'] ?? '';
         schoolName = result[0]['school_name'] ?? '';
+        await FirebaseAnalytics.instance.logEvent(
+    name: 'app_open',
+    parameters: {'user_name': teacherName},
+);
         await db.insert('tracker', {
           'key': 'hasTeacher',
           'value': '$hasTeacher', 
