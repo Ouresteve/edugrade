@@ -1,31 +1,24 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:edugrade/screens/classes_screen.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:edugrade/screens/subject_screen.dart';
 import 'package:flutter/material.dart';
 import 'screens/entry_point.dart';
 import 'screens/theme.dart';
 import 'services/app_state.dart';
 import 'screens/home_screen.dart';
-import 'screens/onboarding_screen.dart';  
 import 'screens/setup.dart';
 import 'screens/cbc_config.dart';
 import 'screens/student_config.dart';
-import 'screens/classes_screen.dart';
 import 'screens/reports_archive_screen.dart';
 import 'screens/settings.dart';
 import 'screens/collaboration.dart';
+import 'screens/app_launch_screen.dart';
 
 
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await AppState.checkTeacherProfile();
-  
-
   runApp(const MyApp());
-
 }
 
 class MyApp extends StatefulWidget {
@@ -37,6 +30,33 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  bool _showLaunch = true;
+  bool _isInitializing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      await Future.wait([
+        Firebase.initializeApp(),
+        AppState.checkTeacherProfile(),
+        Future.delayed(const Duration(milliseconds: 1800)),
+      ]);
+    } catch (e) {
+      debugPrint('App initialization error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _showLaunch = false;
+        });
+      }
+    }
+  }
 
   void toggleTheme() {
     setState(() {
@@ -49,11 +69,11 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return  MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'EduGrade.KE',
+      title: 'EduGrade',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _themeMode,
-      home: const EntryPoint(),
+      home: _showLaunch || _isInitializing ? const AppLaunchScreen() : const EntryPoint(),
        routes: {
         '/home': (context) => const HomeScreen(),
         '/setup': (context) => const TeacherSetupScreen(),

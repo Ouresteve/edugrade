@@ -3,6 +3,7 @@ import 'theme.dart';
 import '../services/database_helper.dart';
 import 'package:sqflite/sqflite.dart';
 import 'classes_detail_screen.dart';
+import '../globals.dart';
 
 
 
@@ -28,10 +29,10 @@ class _EnterMarksScreenState extends State<EnterMarksScreen> {
   bool isSaving = false;  
   String? selectedSubjectCode;
   String _searchQuery = '';
-  String selectedExam = "EXAM 1";
-  String selectedTerm = "Term 1"; 
+  String selectedExam = previousSelectedExam.isNotEmpty ? previousSelectedExam : "EXAM 1";
+  String selectedTerm = previousSelectedTerm.isNotEmpty ? previousSelectedTerm : "Term 1"; 
 
-  String currentLevel = "primary";
+  String currentLevel = selectedLevel;
   String selectedYear = DateTime.now().year.toString(); // Track marks data: {studentId: mark}
   final ScrollController _scrollController = ScrollController();
   bool _isHeaderVisible = true;
@@ -51,7 +52,10 @@ class _EnterMarksScreenState extends State<EnterMarksScreen> {
 
    Future<void> _loadData() async {
     setState(() => isLoading = true);
-    currentLevel = widget.classData['level']?.toString().toLowerCase() ?? "jss";
+    currentLevel = widget.classData['level']?.toString() ?? selectedLevel;
+
+    String levelClass= currentLevel;
+    String  gradingLevel = (currentLevel == "LP") ? "UP":(currentLevel=="UP") ? "UP" : "Js";
     try {
       final db = await DatabaseHelper.instance.database;  // Load Students
   final stuRes = await db.query(
@@ -65,11 +69,14 @@ class _EnterMarksScreenState extends State<EnterMarksScreen> {
   final gradeRes = await db.query(
     'grading_config',
     where: 'level = ?',
-    whereArgs: [currentLevel],
+    whereArgs: [gradingLevel],
   );
   gradingConfig = gradeRes;
   // Load Subjects
-  final subRes = await db.query('subjects', orderBy: 'subject_code ASC');
+  final subRes = await db.query('subjects',
+                                where:'category=?',
+                                whereArgs:[levelClass],
+                                orderBy: 'subject_code ASC');
   subjects = subRes;
 
   // Initialize marks data
@@ -468,15 +475,15 @@ Widget _buildHeaderSection() {
                   contentPadding:const EdgeInsets.symmetric(vertical:6),
                 ),
                 items: const [
-                  DropdownMenuItem(value: "EXAM 1", child: Text("EXAM 1",style: TextStyle(color: Colors.white),)),
-                  DropdownMenuItem(value: "EXAM 2", child: Text("EXAM 2",style: TextStyle(color: Colors.white),)),
-                  DropdownMenuItem(value: "EXAM 3", child: Text("EXAM 3",style: TextStyle(color: Colors.white),)),
+                  DropdownMenuItem(value: "EXAM 1", child: Text("Opener",style: TextStyle(color: Colors.white),)),
+                  DropdownMenuItem(value: "EXAM 2", child: Text("Mid-Term",style: TextStyle(color: Colors.white),)),
+                  DropdownMenuItem(value: "EXAM 3", child: Text("End-Term",style: TextStyle(color: Colors.white),)),
                 ],
                 selectedItemBuilder: (BuildContext context) {
                   return const [
-                     DropdownMenuItem(value: "EXAM 1", child: Text("EXAM 1",style: TextStyle(color: Colors.black87),)),
-                  DropdownMenuItem(value: "EXAM 2", child: Text("EXAM 2",style: TextStyle(color: Colors.black87),)),
-                  DropdownMenuItem(value: "EXAM 3", child: Text("EXAM 3",style: TextStyle(color: Colors.black87),)),
+                     DropdownMenuItem(value: "EXAM 1", child: Text("Opener",style: TextStyle(color: Colors.black87),)),
+                  DropdownMenuItem(value: "EXAM 2", child: Text("Mid-Term",style: TextStyle(color: Colors.black87),)),
+                  DropdownMenuItem(value: "EXAM 3", child: Text("End-Term",style: TextStyle(color: Colors.black87),)),
                   ];
                 },
                 onChanged: (value) {
@@ -706,7 +713,7 @@ if (filteredStudents.isEmpty) {
             mainAxisAlignment: MainAxisAlignment.center,
           children: [ 
             Text(
-              selectedExam ,
+              (selectedExam == "EXAM 1") ? "Opener" : (selectedExam == "EXAM 2") ? "Mid-Term" : (selectedExam == "EXAM 3") ? "End-Term" : selectedExam,
             style:  TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,

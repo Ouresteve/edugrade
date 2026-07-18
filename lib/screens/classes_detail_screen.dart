@@ -7,6 +7,7 @@ import '../globals.dart';
 import 'classes_screen.dart';
 import 'enter_marks.dart';
 import 'class_report_screen.dart';
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 class ClassDetailScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
   final bool triggerAddStudent;
@@ -25,11 +26,12 @@ class ClassDetailScreen extends StatefulWidget {
 
 class _ClassDetailScreenState extends State<ClassDetailScreen> {
   double averageScore = 0.0;
+  String dominantGrade = "-";
   int belowExpectationsCount= 0;
   String selectedYear = DateTime.now().year.toString();
 
-  String selectedExam = "EXAM 1";
-  String selectedTerm = "Term 1";
+  String selectedExam = previousSelectedExam;
+  String selectedTerm = previousSelectedTerm;
   List<Map<String,dynamic>> topSubjects = [];
   List<Map<String,dynamic>> subjects = [];
   List<Map<String,dynamic>> rankedStudents = [];
@@ -43,13 +45,18 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStudents();
+    _initializeScreen();
     
     if (widget.triggerAddStudent){
     WidgetsBinding.instance.addPostFrameCallback((_){
       _addStudent();
     });
   }
+  }
+
+  Future<void> _initializeScreen() async {
+    await _loadSavedParameters();   // Load saved params FIRST
+    await _loadStudents();           // Then load students with correct params
   }
   
 
@@ -82,8 +89,32 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     }
   }
 
+  Future<void> _loadSavedParameters() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final params = await db.query('selected_parameters');
+      
+      for (var param in params) {
+        if (param['key'] == 'selectedExam') {
+          previousSelectedExam = (param['value'] as String?) ?? "EXAM 1";
+        }
+        if (param['key'] == 'selectedTerm') {
+          previousSelectedTerm = (param['value'] as String?) ?? "Term 1";
+        }
+      }
+      
+      setState(() {
+        selectedExam = previousSelectedExam;
+        selectedTerm = previousSelectedTerm;
+      });
+    } catch (e) {
+      print("Error loading saved parameters: $e");
+    }
+  }
+
 Future<void> _calculatePerformance() async {
-  if (students.isEmpty) {
+   String levelClass=widget.classData['level'];
+    if (students.isEmpty) {
     setState(() {
       averageScore = 0;
       belowExpectationsCount = 0;
@@ -98,8 +129,11 @@ Future<void> _calculatePerformance() async {
     
     });
   belowExpectationsCount = 0;
+if (levelClass=="Js"){
+ 
 
   try {
+  
     final db = await DatabaseHelper.instance.database;
     final gradeRes = await db.query (
       'grading_config',
@@ -117,16 +151,38 @@ Future<void> _calculatePerformance() async {
        
     );
     assess = assessments;
+    previousSelectedExam = selectedExam;
+    previousSelectedTerm = selectedTerm;
+    await db.update(
+      'selected_parameters',
+      {
+        'value': selectedExam,
+      },
+      where: 'key = ?',
+      whereArgs: ['selectedExam'],
+    );
+    await db.update(
+      'selected_parameters',
+      {
+        'value': selectedTerm,
+      },
+      where: 'key = ?',
+      whereArgs: ['selectedTerm'],
+    );
 
-    final gradesRe = await db.query(
-    'grading_config',
-    where: 'level = ?',
-    whereArgs: ['agp'],
+       final gradesRe = await db.query(
+      'grading_config',
+       where: 'level = ?',
+     whereArgs: ['agp'],
     
-   );
+      );
+  
 
     final sub = await db.query(
       'subjects',
+      where: 'category=?',
+      whereArgs: [levelClass],
+
     );
     subjects = sub;
 
@@ -208,6 +264,157 @@ Future<void> _calculatePerformance() async {
       isLoadingPerformance = false;
     });
   }
+
+} else {
+  // for primary classes
+  try {
+  
+    final db = await DatabaseHelper.instance.database;
+    final gradeRes = await db.query (
+      'grading_config',
+      where: 'level=?',
+      whereArgs: ['UP'],
+    );
+    final assessments = await db.query(
+      'assessments',
+      where: 'class_id = ? AND term = ? AND academic_year = ? AND assessment_type = ?',
+      whereArgs: [widget.classData['id'],
+       selectedTerm,
+       selectedYear,
+       selectedExam,
+       ],
+       
+    );
+    assess = assessments;
+    previousSelectedExam = selectedExam;
+    previousSelectedTerm = selectedTerm;
+    //mmmh
+    await db.update(
+      'selected_parameters',
+      {
+        'value': selectedExam,
+      },
+      where: 'key = ?',
+      whereArgs: ['selectedExam'],
+    );
+    await db.update(
+      'selected_parameters',
+      {
+        'value': selectedTerm,
+      },
+      where: 'key = ?',
+      whereArgs: ['selectedTerm'],
+    );
+
+  
+
+    final sub = await db.query(
+      'subjects',
+      where: 'category=?',
+      whereArgs: [levelClass],
+
+    );
+    subjects = sub;
+
+     gradingConfig = gradeRes;
+     
+
+    if (assessments.isEmpty) {
+      setState(() {
+        averageScore = 0;
+        belowExpectationsCount = 0;
+        isLoadingPerformance = false;
+        topSubjects = [];
+        rankedStudents = students.map((s) => {...s, 'average': 0.0}).toList();
+      });
+      return;
+    }
+
+    double totalPoints = 0;
+    
+    int totalEntries = 0;
+
+    Map<String, List<String>> subjectGrades = {};
+    Map<String, List<double>> subjectMarks = {};
+    Map<int, List<String>> studentGrades= {};
+    Map<int, List<double>> studentMarks= {};
+
+    for (var a in assessments) {
+      final score = (a['raw_score']as num ?? 0.0).toDouble();
+      final gradeParts = getGradeFromScore(score);
+      final parts = gradeParts.split("|");
+      final grade = parts[0];
+      
+    //  studentGrades.putIfAbsent(a['student_id'] as int, () => []).add(grade);
+      
+      totalEntries++;
+
+      // Subject averages
+      String subject = a['subject_code'] as String;
+      subjectGrades.putIfAbsent(subject, ()=> []).add(grade);
+      subjectMarks.putIfAbsent(subject, ()=> []).add(score);
+           // Student total points
+      int studentId = a['student_id'] as int;
+      studentGrades.putIfAbsent(studentId, () => []).add(grade);
+      studentMarks.putIfAbsent(studentId, () => []).add(score);
+    }
+
+    // Overall Average
+    dominantGrade= subjectGrades.values.expand((grades) => grades).fold<Map<String, int>>({}, (map, grade) {
+      map[grade] = (map[grade] ?? 0) + 1;
+      return map;
+    }).entries.reduce((a, b) => a.value > b.value ? a : b).key;
+
+    
+     
+
+    // Top 3 Subjects
+    topSubjects = subjectMarks.entries.map((e) {
+      double avg = e.value.reduce((a, b) => a + b) / e.value.length;
+      return {'subject': e.key, 'average': avg};
+    }).toList()
+      ..sort((a, b) => (b['average'] as double).compareTo(a['average'] as double));
+
+    if (topSubjects.length > 3) topSubjects = topSubjects.sublist(0, 3);
+
+    // Ranked Students
+    rankedStudents = students.map((s) {
+      int id = s['id'];
+      List<String> grades = studentGrades[id] ?? [];
+      List<double> marks = studentMarks[id] ?? [];
+    
+      double total = marks.isEmpty ? 0 : marks.reduce((a, b) => a + b).toDouble();
+      double avgPoint = marks.isEmpty ? 0 : total / marks.length;
+      String finalGrade = grades.isEmpty ? "-" : grades.fold<Map<String, int>>({}, (map, grade) {
+        map[grade] = (map[grade] ?? 0) + 1;
+        return map;
+      }).entries.reduce((a, b) => a.value > b.value ? a : b).key;
+      String gradeColor = getGradeColor(finalGrade);
+      if(total<=40.0){
+        belowExpectationsCount++;
+      }
+      return {
+        ...s,
+        'totalPoints': total,
+        
+        'finalGrade': finalGrade,
+        'gradeColor': gradeColor,
+      };
+      
+    }).toList()
+      ..sort((a, b) => (b['totalPoints'] as double).compareTo(a['totalPoints'] as double));
+
+
+  } catch (e) {
+    print("Performance calculation error: $e");
+  } finally {
+    setState(() {
+      isLoadingPerformance = false;
+    });
+  }
+
+
+}
 }
 double _getPointsFromScore(double score) {
   
@@ -220,7 +427,14 @@ double _getPointsFromScore(double score) {
   }
   return 0.0;
 }
-
+String getGradeColor(String grade) {
+    for (var g in grading_config) {
+      if(grade==g["grade"]){
+        return g['color'];
+      }
+    }
+    return "#000000";
+}
 String getFinalGrade(double score)  {
 
    String grade = "-";
@@ -242,6 +456,24 @@ String getFinalGrade(double score)  {
 
 }
 
+String getGradeFromScore(double score) {
+   String grade = "-";
+   String colors = "-";
+  
+  
+  for (var g in gradingConfig) {
+    int mark = g['min_mark'] as int;
+   
+    int maxMark = g['max_mark'] as int ;
+    if( score>= mark && score <= maxMark){
+      grade = g['grade'] as String;
+      colors = g['color'];
+      
+    }
+  }
+  return "$grade|$colors";
+}
+
 int _getMinMark() {
   for(var f in gradingConfig){
     final min =(f['min_mark'] as int ?) ?? 0;
@@ -253,6 +485,7 @@ int _getMinMark() {
 }
 return 0;
 }
+
 String _getGradefromPoint(int point) {
 
   for (var g in gradingConfig) {
@@ -275,7 +508,8 @@ String _getGradefromPoint(int point) {
     );
 
     if (success == true) {
-      _loadStudents(); // Refresh student list
+      _loadStudents(); 
+      _addStudent();// Refresh student list
     }
   }
   
@@ -295,21 +529,26 @@ String _getGradefromPoint(int point) {
       final db = await DatabaseHelper.instance.database;
       await db.update(
         'classes',
-        {'class_name': newName.trim()},
+        {'class_name': newName.trim(), 'level': selectedLevel},
         where: 'id = ?',
         whereArgs: [widget.classData['id']],
       );
-      Navigator.pushReplacementNamed(context, '/home');
-      setState((){
-        updatedName = newName.trim();
-        widget.classData['class_name'] = newName.trim();
-      });
-      if (mounted) {
-         Navigator.pop(context);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Class name updated")),
+
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text("Class updated successfully"),
+          backgroundColor: Colors.green,
+        ),
       );
+
+      
+
+      
+      if (mounted) {
+  
+        Navigator.pushReplacementNamed(context, '/home');
+        
       }
 
       
@@ -467,9 +706,9 @@ String _getGradefromPoint(int point) {
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: "EXAM 1", child: Text("EXAM 1")),
-                      DropdownMenuItem(value: "EXAM 2", child: Text("EXAM 2")),
-                      DropdownMenuItem(value: "EXAM 3", child: Text("EXAM 3")),
+                      DropdownMenuItem(value: "EXAM 1", child: Text("Opener")),
+                      DropdownMenuItem(value: "EXAM 2", child: Text("Mid-Term")),
+                      DropdownMenuItem(value: "EXAM 3", child: Text("End-Term")),
                     ],
                     onChanged: (value) {
                       if (value != null) {
@@ -500,7 +739,7 @@ String _getGradefromPoint(int point) {
               children: [
                 _buildAnalyticCard("Total Students", "${students.length}", "", Colors.blue),
                 const SizedBox(width: 12),
-                _buildAnalyticCard("Avg Points", "${averageScore.toStringAsFixed(1)}", "", Colors.green),
+                _buildAnalyticCard("${widget.classData['level']=="Js" ? "Avg Points" : "Dominant Grade"}", "${widget.classData['level']=="Js" ? averageScore.toStringAsFixed(1) : dominantGrade}", "", Colors.green),
               ],
             ),
             const SizedBox(height: 12),
@@ -556,7 +795,9 @@ String _getGradefromPoint(int point) {
                         assessments: assess,
                         getPointsFromScore: _getPointsFromScore,
                         getGrade: getFinalGrade,
+                        getGradeFromScore: getGradeFromScore,
                       ),
+
                     ),
                   );
                 }),
@@ -595,7 +836,7 @@ String _getGradefromPoint(int point) {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: rankedStudents.length,
-                itemBuilder: (context, index) {
+                itemBuilder: widget.classData['level']=="Js" ?(context, index) {
                   final student = rankedStudents[index];
                   final avg = student['totalPoints'] != null 
                           ? (student['totalPoints'] as num).toDouble() 
@@ -654,7 +895,50 @@ String _getGradefromPoint(int point) {
                     ),
                   ),
                   );
-                },
+                } :
+                (context,index) {
+                     final student = rankedStudents[index];
+                     String grade= student['finalGrade'];
+                     String rangi = student['gradeColor'];
+
+                     return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.grey.shade200,
+              child: Text("#${index + 1}"),
+            ),
+            title: Text(student['full_name'] ?? 'N/A'),
+            subtitle: Text(
+              "Adm: ${student['admission_number'] ?? 'N/A'} • $grade",
+              style: TextStyle(
+                color: Color(
+                  int.parse(rangi.replaceFirst('#', '').padLeft(8, 'FF'), radix: 16),
+                ),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.visibility, color: Colors.blue),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Opening ${student['full_name']}'s profile")),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () => _deleteStudent(student['id'], student['full_name']),
+                ),
+              ],
+            ),
+          ),
+        );
+
+                }, 
               ),
           ],
         ),
@@ -672,7 +956,7 @@ String _getGradefromPoint(int point) {
             children: [
               Text(title, style: const TextStyle(fontSize: 14, color: Colors.grey)),
               const SizedBox(height: 8),
-              Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+              Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
               if (change.isNotEmpty) Text(change, style: const TextStyle(fontSize: 13)),
             ],
           ),
@@ -729,6 +1013,7 @@ String _getGradefromPoint(int point) {
 
 //Edit Class Bottom Sheet
 class EditClassBottomSheet extends StatefulWidget {
+
   final String currentName;
   const EditClassBottomSheet({super.key, required this.currentName});
 
@@ -767,6 +1052,21 @@ class _EditClassBottomSheetState extends State<EditClassBottomSheet> {
               border: OutlineInputBorder(),
             ),
           ),
+           const SizedBox(height: 20),
+
+            DropdownButtonFormField<String>(
+              value:selectedLevel,
+              decoration: const InputDecoration(
+                labelText: "School Level",
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: "UP", child: Text("Upper Primary")),
+                DropdownMenuItem(value: "LP", child: Text("Lower Primary")),
+                DropdownMenuItem(value: "Js", child: Text("Junior Secondary (JSS)")),
+              ],
+              onChanged: (value) => setState(() => selectedLevel = value!),
+            ),
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,

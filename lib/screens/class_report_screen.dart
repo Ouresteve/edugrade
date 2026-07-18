@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:excel/excel.dart';
+import '../widgets/app_loading_view.dart';
 
 class ClassReportScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
@@ -14,7 +15,9 @@ class ClassReportScreen extends StatefulWidget {
   final String initialYear;
   final String initialExam;
   final double Function(double) getPointsFromScore;
-   final String Function(double) getGrade;
+  final String Function(double) getGradeFromScore;
+
+  final String Function(double) getGrade;
   final List<Map<String, dynamic>> rankedStudents;
   final List<Map<String, dynamic>> topSubjects;
   final List<Map<String, dynamic>> subjects;
@@ -32,6 +35,7 @@ class ClassReportScreen extends StatefulWidget {
     required this.assessments,
     required this.getPointsFromScore,
     required this.getGrade,
+    required this.getGradeFromScore,
   });
 
   @override
@@ -81,82 +85,99 @@ Future<void> _loadSchoolName() async {
         title: Text("Report - ${widget.classData['class_name']}"),
         backgroundColor: AppTheme.primary,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Report Type Toggle
-            const Text("Report Type", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: false, label: Text("Raw Marks")),
-                ButtonSegment(value: true, label: Text("Points & Grades")),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Report Type Toggle
+                const Text("Report Type", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text("Raw Marks")),
+                    ButtonSegment(value: true, label: Text("Points & Grades")),
+                  ],
+                  selected: {usePoints},
+                  onSelectionChanged: (Set<bool> selection) {
+                    setState(() => usePoints = selection.first);
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                // Filters (Term, Year, Exam) - can be pre-filled
+                const Text("Filters", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+
+                // You can improve this later with better selectors
+
+                const SizedBox(height: 32),
+
+                // Preview Area (Simple for now)
+                const Text("Report Preview", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Card(
+                  child: Container(
+                    height: 200,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    child: Text(
+                      usePoints ? "Points & CBC Grades Preview" : "Raw Marks Preview",
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // Generate Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: isGenerating ? null : () => _generateReport(isPdf: true),
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Text("Generate PDF"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red[700],
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: isGenerating ? null : () => _generateReport(isPdf: false),
+                        icon: const Icon(Icons.table_chart),
+                        label: const Text("Export Excel"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green[700],
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-              selected: {usePoints},
-              onSelectionChanged: (Set<bool> selection) {
-                setState(() => usePoints = selection.first);
-              },
             ),
-
-            const SizedBox(height: 24),
-
-            // Filters (Term, Year, Exam) - can be pre-filled
-            const Text("Filters", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-
-            // You can improve this later with better selectors
-
-            const SizedBox(height: 32),
-
-            // Preview Area (Simple for now)
-            const Text("Report Preview", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Card(
+          ),
+          if (isGenerating)
+            Positioned.fill(
               child: Container(
-                height: 200,
-                width: double.infinity,
-                alignment: Alignment.center,
-                child: Text(
-                  usePoints ? "Points & CBC Grades Preview" : "Raw Marks Preview",
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                color: Colors.black.withOpacity(0.28),
+                child: Center(
+                  child: AppLoadingView(
+                    title: "Preparing your report",
+                    subtitle: "Please wait while your PDF or Excel file is being generated.",
+                    icon: Icons.description_outlined,
+                  ),
                 ),
               ),
             ),
-
-            const SizedBox(height: 40),
-
-            // Generate Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: isGenerating ? null : () => _generateReport(isPdf: true),
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text("Generate PDF"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[700],
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: isGenerating ? null : () => _generateReport(isPdf: false),
-                    icon: const Icon(Icons.table_chart),
-                    label: const Text("Export Excel"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[700],
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -166,10 +187,18 @@ Future<void> _loadSchoolName() async {
 
     try {
       if (isPdf) {
-        await _generatePdfReport();
+        if(widget.classData['level']=="Js") {
+          await _generatePdfReportJs();
+        }else{
+          await _generatePdfReportPri();
+        }
       } else {
-        await _generateExcelReport();
-    
+        if(widget.classData['level']=="Js"){
+        await _generateExcelReportJs();
+        }else {
+          await _generateExcelReportPri();
+
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -181,7 +210,7 @@ Future<void> _loadSchoolName() async {
   }
 
 
-Future<void> _generateExcelReport() async {
+Future<void> _generateExcelReportPri() async {
   setState(() => isGenerating = true);
 
   try {
@@ -196,12 +225,124 @@ Future<void> _generateExcelReport() async {
         }
     // Title
     sheet.appendRow([schoolName]);
-    sheet.appendRow(["${widget.classData['class_name']} | $selectedTerm | $selectedYear | $selectedExam"]);
+    sheet.appendRow(["${widget.classData['class_name']} | $selectedTerm | $selectedYear | ${(selectedExam == "EXAM 1") ? "Opener Exam" : (selectedExam == "EXAM 2") ? "Mid-Term" : (selectedExam == "EXAM 3") ? "End-Term" : selectedExam}"]);
     sheet.appendRow(["Generated: ${DateTime.now().toString().substring(0, 16)}"]);
     sheet.appendRow([]);
 
     // Headers
-    List<String> headers = ["Rank", "Student Name", "Admission Number"];
+    List<String> headers = ["Rank", "Student Name", "Admission Number"]; 
+
+    for (var sub in widget.subjects) {
+      headers.add(sub['subject_code'] as String);
+    }
+
+    headers.add(usePoints ? "Total Points" : "Average %");
+    headers.add("Grade");
+
+    sheet.appendRow(headers);
+
+    // Fill Student Data
+    for (int i = 0; i < widget.rankedStudents.length; i++) {
+      final student = widget.rankedStudents[i];
+      final studentId = student['id'] as int;
+      final avgPoint = student['totalPoints'] as double? ?? 0.0;
+      String grade = "-";
+      List<dynamic> row = [
+        "#${i + 1}",
+        student['full_name'] ?? 'N/A',
+        student['admission_number'] ?? 'N/A',
+      ];
+
+      // Subject columns
+      for (var sub in widget.subjects) {
+        final subjectCode = sub['subject_code'] as String;
+
+        final markEntry = widget.assessments.firstWhere(
+          (a) => a['student_id'] == studentId && a['subject_code'] == subjectCode && a['assessment_type'] == selectedExam && a['term']  == selectedTerm && a['academic_year'] == selectedYear,
+          orElse: () => <String, dynamic>{},
+        );
+
+        final rawScore = markEntry['raw_score'] as double?;
+     
+         final gradePart=  rawScore != null
+          ?widget.getGradeFromScore(rawScore)
+          : "-|#000";
+        final partsOfGrade = gradePart.split("|");
+        grade = partsOfGrade[0];
+        final display = usePoints 
+            ? (grade ?? "-")
+            : (rawScore?.toStringAsFixed(0) ?? "-");
+
+        row.add(display);
+      }
+      
+      
+      String Grade = student['finalGrade'] ?? "-";
+      row.add(usePoints ? avgPoint.toStringAsFixed(1) : "-");
+      row.add(Grade);  
+
+      sheet.appendRow(row);
+    }
+
+    // Save to Downloads folder
+     final timestamp = DateTime.now().toString()
+        .substring(0, 19)
+        .replaceAll(' ', '_')
+        .replaceAll(':', '')
+        .replaceAll('-', '');
+    final directory = await getExternalStorageDirectory();
+    final fileName = "EduGrade_${widget.classData['class_name']}_${selectedTerm}_${selectedYear}_$timestamp.xlsx";
+    final reportsDir = Directory('${directory!.path}/EduGrade_Reports');
+    if (!await reportsDir.exists() ) {
+      await reportsDir.create(recursive: true);
+    }
+    final filePath ='${reportsDir.path}/$fileName';
+    final fileBytes = excel.encode()!;
+    final file = File(filePath);
+    await file.writeAsBytes(fileBytes);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Excel saved successfully!, Check reports section\n\n$filePath"),
+          backgroundColor: AppTheme.success,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Excel failed: $e"),
+        backgroundColor: AppTheme.error,),
+      );
+    }
+  } finally {
+    setState(() => isGenerating = false);
+  }
+}
+
+Future<void> _generateExcelReportJs() async {
+  setState(() => isGenerating = true);
+
+  try {
+    final excel = Excel.createExcel();
+    final sheet = excel['${widget.classData['class_name']}_Report'];
+    final db = await DatabaseHelper.instance.database;
+    final result = await db.query('teacher', limit: 1);
+        if (result.isNotEmpty) {
+            setState((){
+                schoolName = result.first['school_name'] as String ?? "Your School";
+            });
+        }
+    // Title
+    sheet.appendRow([schoolName]);
+    sheet.appendRow(["${widget.classData['class_name']} | $selectedTerm | $selectedYear | ${(selectedExam == "EXAM 1") ? "Opener Exam" : (selectedExam == "EXAM 2") ? "Mid-Term" : (selectedExam == "EXAM 3") ? "End-Term" : selectedExam}"]);
+    sheet.appendRow(["Generated: ${DateTime.now().toString().substring(0, 16)}"]);
+    sheet.appendRow([]);
+
+    // Headers
+    List<String> headers = ["Rank", "Student Name", "Admission Number"]; 
 
     for (var sub in widget.subjects) {
       headers.add(sub['subject_code'] as String);
@@ -274,7 +415,7 @@ Future<void> _generateExcelReport() async {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Excel saved successfully!\n$filePath"),
+          content: Text("Excel saved successfully!, Check reports section\n\n$filePath"),
           backgroundColor: AppTheme.success,
           duration: const Duration(seconds: 5),
         ),
@@ -292,8 +433,68 @@ Future<void> _generateExcelReport() async {
   }
 }
 
+Future<void> _generatePdfReportPri() async {
+    setState(()=>isGenerating = true);
 
- Future<void> _generatePdfReport() async {
+    try{
+      final pdf= pw.Document();
+
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          orientation: pw.PageOrientation.landscape,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => _buildPdfHeader(context),
+          footer:(context)=>_buildPdfFooter(context),
+          build: (context) => _buildPdfContentPri(), 
+        ),
+      );
+      final pdfBytes = await pdf.save();
+
+    // Show preview first
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdfBytes,
+    );
+    final timestamp = DateTime.now().toString()
+        .substring(0, 19)
+        .replaceAll(' ', '_')
+        .replaceAll(':', '')
+        .replaceAll('-', '');
+    final directory = await getExternalStorageDirectory();
+    if (directory != null) {
+      final reportsDir = Directory('${directory.path}/EduGrade_Reports');
+      if (!await reportsDir.exists()) {
+        await reportsDir.create(recursive: true);
+      }
+
+      final fileName = "EduGrade_${widget.classData['class_name']}_${selectedTerm}_${selectedYear}_$timestamp.pdf";
+      final filePath = '${reportsDir.path}/$fileName';
+
+      final file = File(filePath);
+      await file.writeAsBytes(pdfBytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("PDF saved: $fileName"),
+          backgroundColor: AppTheme.success,),
+        );
+      }
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to generate PDF: $e"),
+        backgroundColor: AppTheme.error,),
+      );
+    }
+  } finally {
+    setState(() => isGenerating = false);
+  }
+}
+
+
+ Future<void> _generatePdfReportJs() async {
   setState(() => isGenerating = true);
 
   try {
@@ -306,7 +507,7 @@ Future<void> _generateExcelReport() async {
         margin: const pw.EdgeInsets.all(32),
         header: (context) => _buildPdfHeader(context),
         footer: (context) => _buildPdfFooter(context),
-        build: (context) => _buildPdfContent(),
+        build: (context) => _buildPdfContentJs(),
       ),
     );
 
@@ -366,7 +567,7 @@ pw.Widget _buildPdfHeader(pw.Context context) {
       ),
       pw.SizedBox(height: 8),
       pw.Text(
-        "${widget.classData['class_name']} |  $selectedTerm | $selectedYear | $selectedExam",
+        "${widget.classData['class_name']} |  $selectedTerm | $selectedYear | ${(selectedExam == "EXAM 1") ? "Opener Exam" : (selectedExam == "EXAM 2") ? "Mid-Term" : (selectedExam == "EXAM 3") ? "End-Term" : selectedExam}",
         style:  pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
         textAlign: pw.TextAlign.center,
       ),
@@ -393,8 +594,126 @@ pw.Widget _buildPdfFooter(pw.Context context) {
     ],
   );
 }
+List<pw.Widget> _buildPdfContentPri() {
+  final subjectList = widget.subjects;
 
-List<pw.Widget> _buildPdfContent() {
+  return[
+    pw.Text(
+      usePoints ? "Final Results-Grades" : "Raw Marks Report",
+      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight. bold),
+    ),
+    pw.SizedBox(height: 15),
+    pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
+      columnWidths: {
+        0: const pw.FixedColumnWidth(40),      // Rank
+        1: const pw.FlexColumnWidth(2.6),      // Student Name
+        2: const pw.FixedColumnWidth(70),  
+      },
+
+       children: [
+        // Header
+        pw.TableRow(
+          decoration:  pw.BoxDecoration(color: PdfColors.blueGrey200),
+          repeat: true,
+        
+          children: [
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text("Rank", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text("Student Name", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text("Adm No", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+
+            // Subject Columns
+            ...subjectList.map((sub) => 
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(6),
+                child: pw.Text(
+                  sub['subject_code'] as String,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  textAlign: pw.TextAlign.center,
+                ),
+              )
+            ),
+
+            pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text("Grade", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+          ],
+        ),
+        // Student Rows
+        ...List.generate(widget.rankedStudents.length, (index) {
+          final student = widget.rankedStudents[index];
+          final studentId = student['id'] as int;
+        
+          final part = student['gradeColor'];
+          String Grade = student['finalGrade'];
+          PdfColor rangi = PdfColor.fromHex(part.replaceFirst("#", '')); 
+
+          return pw.TableRow(
+            children: [
+              pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text("#${index+1}")),
+              pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(student['full_name'] ?? 'N/A')),
+              pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(student['admission_number'] ?? 'N/A')),
+
+              // Subject Cells → Raw Marks or Points only
+              ...subjectList.map((sub) {
+                final subjectCode = sub['subject_code'] as String;
+
+                final markEntry = widget.assessments.firstWhere(
+                  (a) => a['student_id'] == studentId && a['subject_code'] == subjectCode,
+                  orElse: () => <String, dynamic>{},
+                );
+
+                final rawScore = markEntry['raw_score'] as double?;
+                final gradePart =  rawScore != null
+                ? widget.getGradeFromScore(rawScore)
+                : "-|#000";
+              
+                final grades=gradePart.split("|");
+                final grade = grades[0];
+                final gradeColorStr = grades[1];
+                final display = usePoints 
+                    ? (grade ?? "-")
+                    : (rawScore?.toStringAsFixed(0) ?? "-");
+                final pdfColor = PdfColor.fromHex(gradeColorStr.replaceAll('#', ''));
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(display, textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(color: pdfColor),
+                  ),
+                );
+              }).toList(),
+
+              // Total Points / Avg
+  
+              
+              // Final Overall Grade with Color
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(6),
+                child: pw.Text(
+                  "$Grade", 
+                  style:  pw.TextStyle(color: rangi, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+            ],
+          );
+        }),
+      ],
+    ),
+    
+    pw.SizedBox(height: 30),
+
+    // Top 3 Subjects
+    pw.Text("Top 3 Subjects", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+    pw.SizedBox(height: 10),
+    pw.Text(
+      widget.topSubjects.isNotEmpty 
+        ? widget.topSubjects.map((s) => "${s['subject']} (${(s['average'] as double).toStringAsFixed(1)})").join(" \n ") 
+        : "No data available",
+    ),
+  ];
+
+}
+
+
+List<pw.Widget> _buildPdfContentJs() {
   final subjectList = widget.subjects;
 
   return [

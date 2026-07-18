@@ -33,6 +33,8 @@ class DatabaseHelper {
         school_name TEXT NOT NULL,
         email TEXT,
         phone TEXT,
+        is_synced TEXT,
+
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
         ) '''
     );
@@ -44,7 +46,8 @@ class DatabaseHelper {
         min_mark INTEGER,
         max_mark  INTEGER,
         point    INTEGER,
-        color    TEXT
+        color    TEXT,
+        is_synced TEXT
       )
       ''');
     
@@ -102,9 +105,17 @@ class DatabaseHelper {
         term INTEGER DEFAULT 1,
         teacher_id INTEGER,
         student_count INTEGER DEFAULT 0,
+        is_synced TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       )
+    ''');
+    await db.execute(''' 
+          CREATE TABLE IF NOT EXISTS selected_parameters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT UNIQUE NOT NULL,
+            value TEXT NOT NULL
+          )
     ''');
 
     await db.execute('''
@@ -114,6 +125,7 @@ class DatabaseHelper {
         full_name TEXT NOT NULL,
         class_name TEXT,                    
         class_id INTEGER,
+        is_synced TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       )
@@ -128,10 +140,12 @@ class DatabaseHelper {
     academic_year TEXT NOT NULL,
     term INTEGER NOT NULL,
     raw_score REAL NOT NULL,           
-    assessment_type TEXT,              
+    assessment_type TEXT,
+    is_synced TEXT,
     recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id),
     FOREIGN KEY (class_id) REFERENCES classes(id),
+
     UNIQUE(student_id, subject_code, academic_year, term, assessment_type)
   )
 ''');
@@ -140,33 +154,48 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS subjects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject_code TEXT UNIQUE NOT NULL,
+        subject_code TEXT  NOT NULL,
         subject_name TEXT NOT NULL,
-        category TEXT,
+        category TEXT NOT NULL,
         is_default INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        is_synced TEXT
       )
     ''');
 
   await _insertDefaultSubjects(db);
   await _insertPrimaryGrades(db);
+  await _insertDefaultselected_parameters(db);
 
   }
 
+   Future<void> _insertDefaultselected_parameters(Database db) async {
+    final defaultParameters = [
+      {'key': 'selectedExam', 'value': "EXAM 1"},
+      {'key': 'selectedTerm', 'value': "Term 1"},
+    ];
+
+    for (var param in defaultParameters) {
+      await db.insert('selected_parameters', {
+        'key': param['key'],
+        'value': param['value'],
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+   }
    Future<void> _insertPrimaryGrades(Database db) async {
       final defaultPrimaryGrades= [
-        {'level':'primary', 'grade': 'EE', 'min_mark':80, 'max_mark': 100, 'color': '#28A745'},
-        {'level':'primary', 'grade': 'ME', 'min_mark':60, 'max_mark': 79, 'color': '#2196F3'},
-        {'level':'primary', 'grade': 'AE', 'min_mark':40, 'max_mark': 59, 'color': '#FF9800'},
-        {'level':'primary', 'grade': 'BE', 'min_mark':0, 'max_mark': 39 ,'color':'#F44336'},
-        {'level':'jss', 'grade':'EE1', 'min_mark':85,'max_mark':100, 'point':8, 'color':'#15803D'},
-        {'level':'jss', 'grade':'EE2', 'min_mark':75,'max_mark':84, 'point':7, 'color':'#16A34A'},
-        {'level':'jss', 'grade':'ME1', 'min_mark':65,'max_mark':74, 'point':6, 'color':'#2563EB'},
-        {'level':'jss', 'grade':'ME2', 'min_mark':55,'max_mark':64, 'point':5, 'color':'#3B82F6'},
-        {'level':'jss', 'grade':'AE1', 'min_mark':45,'max_mark':54, 'point':4, 'color':'#60A5FA'},
-        {'level':'jss', 'grade':'AE2', 'min_mark':35,'max_mark':44, 'point':3, 'color':'#F59E0B'},
-        {'level':'jss', 'grade':'BE1', 'min_mark':25,'max_mark':34, 'point':2, 'color':'#F97316'},
-        {'level':'jss', 'grade':'BE2', 'min_mark':0,'max_mark':24, 'point':1, 'color':'#DC2626'},
+        {'level':'UP', 'grade': 'EE', 'min_mark':80, 'max_mark': 100, 'color': '#28A745'},
+        {'level':'UP', 'grade': 'ME', 'min_mark':60, 'max_mark': 79, 'color': '#2196F3'},
+        {'level':'UP', 'grade': 'AE', 'min_mark':40, 'max_mark': 59, 'color': '#FF9800'},
+        {'level':'UP', 'grade': 'BE', 'min_mark':0, 'max_mark': 39 ,'color':'#F44336'},
+        {'level':'Js', 'grade':'EE1', 'min_mark':85,'max_mark':100, 'point':8, 'color':'#15803D'},
+        {'level':'Js', 'grade':'EE2', 'min_mark':75,'max_mark':84, 'point':7, 'color':'#16A34A'},
+        {'level':'Js', 'grade':'ME1', 'min_mark':65,'max_mark':74, 'point':6, 'color':'#2563EB'},
+        {'level':'Js', 'grade':'ME2', 'min_mark':55,'max_mark':64, 'point':5, 'color':'#3B82F6'},
+        {'level':'Js', 'grade':'AE1', 'min_mark':45,'max_mark':54, 'point':4, 'color':'#60A5FA'},
+        {'level':'Js', 'grade':'AE2', 'min_mark':35,'max_mark':44, 'point':3, 'color':'#F59E0B'},
+        {'level':'Js', 'grade':'BE1', 'min_mark':25,'max_mark':34, 'point':2, 'color':'#F97316'},
+        {'level':'Js', 'grade':'BE2', 'min_mark':0,'max_mark':24, 'point':1, 'color':'#DC2626'},
 
         //Aggregate points
         {'level':'agp', 'grade':'EE1', 'min_mark':68,'max_mark':72, 'point':8, 'color':'#15803D'},
@@ -193,15 +222,36 @@ class DatabaseHelper {
    }
    Future<void> _insertDefaultSubjects(Database db) async {
     final defaultSubjects = [
-      {'code': 'ENG', 'name': 'English', 'category': 'Core'},
-      {'code': 'KISW', 'name': 'Kiswahili', 'category': 'Core'},
-      {'code': 'MAT', 'name': 'Mathematics', 'category': 'Core'},
-      {'code': 'INT SCI', 'name': 'Integrated Science', 'category': 'Core'},
-      {'code': 'S/ST', 'name': 'Social Studies', 'category': 'Core'},
-      {'code': 'PRE-TECH', 'name': 'Pre-Technical Studies', 'category': 'Core'},
-      {'code': 'AGRIC', 'name': 'Agriculture', 'category': 'Core'},
-      {'code': 'CAS', 'name': 'Creative Arts & Sports', 'category': 'Core'},
-      {'code': 'CRE', 'name': 'Christian Religious Education', 'category': 'Core'},
+      {'code': 'ENG', 'name': 'English', 'category': 'Js'},
+      {'code': 'KISW', 'name': 'Kiswahili', 'category': 'Js'},
+      {'code': 'MAT', 'name': 'Mathematics', 'category': 'Js'},
+      {'code': 'INTSCI', 'name': 'Integrated Science', 'category': 'Js'},
+      {'code': 'SST', 'name': 'Social Studies', 'category': 'Js'},
+      {'code': 'PRE-TECH', 'name': 'Pre-Technical Studies', 'category': 'Js'},
+      {'code': 'AGRIC', 'name': 'Agriculture', 'category': 'Js'},
+      {'code': 'CAS', 'name': 'Creative Arts & Sports', 'category': 'Js'},
+      {'code': 'CRE', 'name': 'Christian Religious Education', 'category': 'Js'},
+      
+      //Upper Primary defaults
+      {'code':'ENG', 'name':'English', 'category':'UP'},
+      {'code':'KISW', 'name':'Kiswahili', 'category':'UP'},
+      {'code':'MAT', 'name':'Mathematics', 'category':'UP'},
+      {'code':'SCI', 'name':'Science', 'category':'UP'},
+      {'code':'SST', 'name':'Social Studies', 'category':'UP'},
+      {'code':'AGRIC', 'name':'Agriculture', 'category':'UP'},
+      {'code':'CAS', 'name':'Creative Arts & Sports', 'category':'UP'},
+      {'code':'CRE', 'name':'Christian Religious Education', 'category':'UP'},
+      
+      //Lower Primary defaults
+      {'code':'ENG', 'name':'English', 'category':'LP'},
+      {'code':'KISW', 'name':'Kiswahili', 'category':'LP'},
+      {'code':'MAT', 'name':'Mathematics', 'category':'LP'},
+      {'code':'ENV', 'name':'Environmental Activites(Inc. Hygiene)', 'category':'LP'},
+      {'code':'SST', 'name':'Social Studies', 'category':'LP'},
+      
+     
+      {'code':'CRE', 'name':'Christian Religious Education', 'category':'LP'},
+      
     ];
 
     for (var sub in defaultSubjects) {
@@ -209,7 +259,7 @@ class DatabaseHelper {
         'subject_code': sub['code'],
         'subject_name': sub['name'],
         'category': sub['category'],
-        'is_default': 1,
+        'is_default': 0,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }

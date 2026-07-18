@@ -168,6 +168,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
               builder: (_) => ClassDetailScreen(classData: cls),
             ),
           );
+          selectedLevel= cls['level'];
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Opened ${cls['class_name']}")),
           );
@@ -227,7 +228,7 @@ class AddClassBottomSheet extends StatefulWidget {
 class _AddClassBottomSheetState extends State<AddClassBottomSheet> {
   final _formKey = GlobalKey<FormState>();
   final _classNameController = TextEditingController();
-  String selectedLevel = "jss";
+  
 
   @override
   Widget build(BuildContext context) {
@@ -265,8 +266,9 @@ class _AddClassBottomSheetState extends State<AddClassBottomSheet> {
                 border: OutlineInputBorder(),
               ),
               items: const [
-                DropdownMenuItem(value: "primary", child: Text("Primary")),
-                DropdownMenuItem(value: "jss", child: Text("Junior Secondary (JSS)")),
+                DropdownMenuItem(value: "UP", child: Text("Upper Primary")),
+                DropdownMenuItem(value: "LP", child: Text("Lower Primary")),
+                DropdownMenuItem(value: "Js", child: Text("Junior Secondary (JSS)")),
               ],
               onChanged: (value) => setState(() => selectedLevel = value!),
             ),

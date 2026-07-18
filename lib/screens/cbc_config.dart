@@ -3,6 +3,7 @@ import 'theme.dart';
 import '../services/database_helper.dart';
 import 'package:sqflite/sqflite.dart';
 import '../globals.dart';
+import '../widgets/app_loading_view.dart';
 
 class CbcConfigScreen extends StatefulWidget {
   const CbcConfigScreen({super.key});
@@ -13,7 +14,7 @@ class CbcConfigScreen extends StatefulWidget {
 
 class _CbcConfigScreenState extends State<CbcConfigScreen> {
   bool _isLoading = true;
-  String selectedLevel = "primary"; // "primary" or "jss"
+
 
   final Map<String, TextEditingController> _minControllers = {};
   final Map<String, TextEditingController> _maxControllers = {};
@@ -22,7 +23,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
   @override
   void initState() {
     super.initState();
-    selectedLevel = isjss ? "jss" : "primary";
+    selectedLevel = isjss ? "Js" : "UP";
     _loadGradingConfig();
   }
 
@@ -47,7 +48,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
         _minControllers[key] = TextEditingController(text: (row['min_mark'] ?? 0).toString());
         _maxControllers[key] = TextEditingController(text: (row['max_mark'] ?? 100).toString());
 
-        if (selectedLevel == "jss" && row['point'] != null) {
+        if (selectedLevel == "Js" && row['point'] != null) {
           _pointControllers[key] = TextEditingController(text: (row['point'] ?? 0).toString());
         }
       }
@@ -68,7 +69,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
         String grade = entry.key;
         int minMark = int.tryParse(entry.value.text.trim()) ?? 0;
         int maxMark = int.tryParse(_maxControllers[grade]?.text.trim() ?? '100') ?? 100;
-        int? point = selectedLevel == "jss"
+        int? point = selectedLevel == "Js"
             ? int.tryParse(_pointControllers[grade]?.text.trim() ?? '0')
             : null;
 
@@ -85,7 +86,7 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
       }
 
       // Update global
-      isjss = (selectedLevel == "jss");
+      isjss = (selectedLevel == "Js");
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -107,10 +108,19 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: Center(
+          child: AppLoadingView(
+            title: "Loading grading setup",
+            subtitle: "We are preparing your CBC grading configuration.",
+            icon: Icons.tune_rounded,
+          ),
+        ),
+      );
     }
 
-    final bool isJSS = selectedLevel == "jss";
+    final bool isJSS = selectedLevel == "Js";
 
     return Scaffold(
       appBar: AppBar(
@@ -128,8 +138,8 @@ class _CbcConfigScreenState extends State<CbcConfigScreen> {
 
             SegmentedButton<String>(
               segments: const [
-                ButtonSegment(value: "primary", label: Text("Primary")),
-                ButtonSegment(value: "jss", label: Text("Junior Secondary")),
+                ButtonSegment(value: "UP", label: Text("Primary")),
+                ButtonSegment(value: "Js", label: Text("Junior Secondary")),
               ],
               selected: {selectedLevel},
               onSelectionChanged: (Set<String> selection) {
