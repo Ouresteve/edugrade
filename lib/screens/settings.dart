@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import '../services/database_helper.dart';
-import 'package:sqflite/sqflite.dart';
-import '../main.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -36,13 +34,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (result.isNotEmpty) {
         final data = result.first;
         setState(() {
-          teacherName = (data['full_name'] as String) ?? "";
-          schoolName = (data['school_name'] as String) ?? "";
-          phone = (data['phone'] as String)  ?? "";
+          teacherName = (data['full_name'] as String?) ?? "";
+          schoolName = (data['school_name'] as String?) ?? "";
+          phone = (data['phone'] as String?) ?? "";
         });
       }
     } catch (e) {
-      print("Error loading profile: $e");
+      debugPrint("Error loading profile: $e");
     }
   }
 
@@ -117,15 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.info_outline),
             title: const Text("About EduGrade"),
             subtitle: const Text("Version 1.0.0"),
-            onTap: () {
-              showAboutDialog(
-                context: context,
-                applicationName: "EduGrade",
-                applicationVersion: "1.0.0",
-                applicationLegalese: "Offline CBC Grading for Kenyan Teachers",
-            
-              );
-            },
+            onTap: _showAboutDialog,
           ),
         ],
       ),
@@ -158,7 +148,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-   void _editProfile() async {
+   void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.school_rounded, color: AppTheme.primary, size: 28),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "EduGrade",
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            "Version 1.0.0",
+                            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  "Offline CBC grading for Kenyan teachers — designed to simplify classroom assessment, reporting, and student tracking.",
+                  style: TextStyle(fontSize: 14, color: Colors.grey[800], height: 1.5),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mail_outline, color: AppTheme.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SelectableText(
+                          "Developer: steveoure96@gmail.com",
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          showLicensePage(
+                            context: context,
+                            applicationName: "EduGrade",
+                            applicationVersion: "1.0.0",
+                            applicationLegalese: "Offline CBC Grading for Kenyan Teachers",
+                          );
+                        },
+                        icon: const Icon(Icons.description_outlined),
+                        label: const Text("View Licenses"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _editProfile() async {
     final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
@@ -247,7 +337,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
   Widget build(BuildContext context) {
 
       // 1. Define this key at the top of your State class (outside the build method)
-final _formKey = GlobalKey<FormState>();
+final formKey = GlobalKey<FormState>();
 
 // 2. Your updated layout code:
 return Padding(
@@ -258,7 +348,7 @@ return Padding(
     top: 24,
   ),
   child: Form(
-    key: _formKey, // Attach the form key here
+    key: formKey, // Attach the form key here
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [

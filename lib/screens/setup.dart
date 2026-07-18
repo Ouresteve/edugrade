@@ -3,7 +3,7 @@ import 'package:edugrade/screens/cbc_config.dart';
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import '../services/database_helper.dart';
-import 'loading_dialog.dart';
+import '../services/app_state.dart';
 import 'package:sqflite/sqflite.dart';
 
 class TeacherSetupScreen extends StatefulWidget {
@@ -41,28 +41,33 @@ class _TeacherSetupScreenState extends State<TeacherSetupScreen> {
       });
       
       if (mounted) {
-        
-        ScaffoldMessenger.of(context).showSnackBar(
+        final currentContext = context;
+        if (!mounted) return;
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(currentContext).showSnackBar(
           const SnackBar(content: Text("Profile saved successfully!")),
         );
+        hasTeacher = true;
         continuingOnboarding = true; 
         await db.insert('tracker', {
           'key': 'continuingOnboarding',
           'value': '$continuingOnboarding',
         }, conflictAlgorithm: ConflictAlgorithm.replace); 
-        // Set the flag to indicate we're continuing onboarding
-        //Navigate to dashboard here!
-        //Navigator.pushReplacementNamed(context, '/cbc_config');
-        Navigator.pushReplacement(context, 
+        await AppState.checkTeacherProfile();
+        if (!mounted) return;
+        // ignore: use_build_context_synchronously
+        Navigator.pushReplacement(currentContext, 
                   MaterialPageRoute(
                     builder: (_) => const CbcConfigScreen(),
                   ),
                   );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
     } finally {
       //LoadingDialog.hide(context);
       setState(() => _isLoading = false);

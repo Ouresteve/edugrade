@@ -95,7 +95,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       appBar: AppBar(
        backgroundColor: const Color(0xFF1A73E8),
         title: const Text(
-          "EduGrade.KE",
+          "EduGrade",
          style:  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
 

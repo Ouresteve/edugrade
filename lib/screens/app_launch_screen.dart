@@ -146,7 +146,7 @@ class _AppLaunchScreenState extends State<AppLaunchScreen>
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        'Syncing student records and grading rules',
+                        'Staging student records and grading rules',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.white.withValues(alpha: 0.7),
