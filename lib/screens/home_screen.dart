@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'classes_detail_screen.dart';
 import 'theme.dart';
 import '../services/database_helper.dart';
+import '../services/update_checker.dart';
 import 'package:sqflite/sqflite.dart';
 
 /*import 'entry_point.dart';
@@ -30,12 +31,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;  
   @override
   void initState() {
-
-
     super.initState();
     Initializedatainclass();
     _setGreeting();
-    
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        UpdateChecker.checkForUpdate(context);
+      }
+    });
   }
 
   void _setGreeting() {

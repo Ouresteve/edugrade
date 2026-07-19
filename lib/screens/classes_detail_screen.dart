@@ -325,7 +325,9 @@ if (levelClass=="Js"){
         belowExpectationsCount = 0;
         isLoadingPerformance = false;
         topSubjects = [];
-        rankedStudents = students.map((s) => {...s, 'average': 0.0}).toList();
+        rankedStudents = students.map((s) => {...s, 'totalPoints': 0.0,
+          'finalGrade': '-',
+          'gradeColor': '#6B7280',}).toList();
       });
       return;
     }
